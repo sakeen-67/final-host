@@ -1,0 +1,551 @@
+# 🛣️ IRDDP — Intelligent Road Damage Detection and Prioritization
+
+<div align="center">
+
+![IRDDP Banner](https://img.shields.io/badge/IRDDP-Road%20Damage%20Detection-003366?style=for-the-badge&logo=python)
+![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green?style=flat-square&logo=fastapi)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-orange?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+
+**A full-stack AI-powered web application for citizen-driven road damage reporting and municipal prioritization.**
+
+*VI Semester CSE Capstone Project — 2026*
+
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Tech Stack](#-tech-stack)
+- [AI Model Details](#-ai-model-details)
+- [Severity Algorithm](#-severity-algorithm)
+- [Project Structure](#-project-structure)
+- [Installation](#-installation)
+- [Running the Project](#-running-the-project)
+- [API Reference](#-api-reference)
+- [Database Schema](#-database-schema)
+- [Screenshots](#-screenshots)
+- [Team](#-team)
+- [Future Scope](#-future-scope)
+
+---
+
+## 🌟 Overview
+
+IRDDP is an intelligent civic platform that empowers citizens to report road damage by uploading photos from their devices. The system uses a fine-tuned **YOLOv8 deep learning model** to automatically detect potholes, calculates a **multi-factor severity and priority score**, stores reports in a database, sends email confirmations, and generates downloadable PDF reports.
+
+Municipal administrators can log into a secure dashboard to view all reports, update repair status, and communicate progress back to citizens in real time via **WebSocket**.
+
+> **Problem Statement:** India loses ₹1.47 lakh crore annually due to poor road conditions. Manual road inspection is slow, inconsistent, and resource-intensive. IRDDP automates detection and prioritization to direct repair resources where they are needed most.
+
+---
+
+## ✨ Key Features
+
+### Citizen Portal
+- 📸 **Multi-image upload** — Upload up to 10 road photos at once
+- 📷 **Live camera capture** — Capture directly from rear-facing mobile camera
+- 📍 **GPS location** — Auto-fills GPS coordinates with drag-pin map support
+- 🤖 **AI Detection** — YOLOv8 detects potholes with confidence scoring
+- 📊 **Severity scoring** — 3-factor algorithm (area + position + shape)
+- ✉️ **OTP verification** — Email OTP before report submission
+- 📧 **Email confirmation** — Automatic report confirmation via Gmail
+- 📄 **PDF report** — Auto-downloaded on submission
+- 🔍 **Report tracking** — Track status using Report ID
+- 🔴 **Real-time updates** — WebSocket-based live status notifications
+
+### Admin Portal
+- 🔐 **Secure login** — Username/password authentication
+- 📋 **All reports dashboard** — View, filter, search reports
+- 🗺️ **Map view** — All reports plotted on OpenStreetMap
+- ✏️ **Status management** — Update: Pending → Under Review → In Progress → Resolved
+- 🗑️ **Delete reports** — Remove invalid or duplicate reports
+- 📊 **Statistics overview** — Total, critical, pending, resolved counts
+- 📡 **Real-time broadcast** — Status updates pushed to citizen trackers
+
+### Security
+- 🔒 OTP email verification before submission
+- 🤖 Google reCAPTCHA v3 bot detection
+- ⏱️ Rate limiting (slowapi) — 10 submissions/hour per IP
+- 🔑 Admin credentials stored with SHA-256 hashing
+- 📁 File validation — magic bytes check (JPEG/PNG/WEBP only, max 10MB)
+- 🧹 Automatic cleanup of orphan temp files on startup
+
+---
+
+## 🏗️ System Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   CITIZEN BROWSER                   │
+│              React 18 + Vite + Leaflet               │
+└────────────────────┬────────────────────────────────┘
+                     │ HTTP / WebSocket
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│              FastAPI Backend (Python 3.11)           │
+│                                                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────┐  │
+│  │  YOLOv8m    │  │  OTP + Email │  │  reCAPTCHA│  │
+│  │  Detection  │  │  (Gmail SMTP)│  │  v3 Check │  │
+│  └─────────────┘  └──────────────┘  └───────────┘  │
+│                                                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────┐  │
+│  │  SQLite DB  │  │  WebSocket   │  │  Rate     │  │
+│  │  (reports)  │  │  Manager     │  │  Limiter  │  │
+│  └─────────────┘  └──────────────┘  └───────────┘  │
+└─────────────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                 ADMIN BROWSER                        │
+│            Admin Dashboard + Map View                │
+└─────────────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+1. Citizen uploads images → `/analyze` → YOLO detects potholes → preview shown
+2. Citizen verifies OTP → `/verify-otp` → confirmed
+3. Citizen submits → `/submit` → DB saved → email sent → PDF downloaded → Report ID given
+4. Admin updates status → `/admin/reports/{id}` → WebSocket broadcasts to citizen
+5. Citizen sees real-time update on tracking page
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+| Technology | Version | Purpose |
+|---|---|---|
+| React | 18 | Component-based UI |
+| Vite | 5 | Build tool & dev server |
+| Axios | 1.x | HTTP client |
+| React Router | 6 | Client-side routing |
+| React Leaflet | Latest | Map with drag-pin location |
+| Custom CSS | — | Government portal design system |
+
+### Backend
+| Technology | Version | Purpose |
+|---|---|---|
+| Python | 3.11 | Runtime |
+| FastAPI | 0.135 | Async REST API + WebSocket |
+| Uvicorn | 0.41 | ASGI server |
+| SQLite | Built-in | Database |
+| smtplib | Built-in | Gmail SMTP email |
+| slowapi | Latest | Rate limiting |
+| httpx | Latest | Async HTTP (reCAPTCHA) |
+
+### AI / ML
+| Technology | Version | Purpose |
+|---|---|---|
+| Ultralytics | 8.3 | YOLOv8 training & inference |
+| PyTorch | 2.10 | Deep learning framework |
+| OpenCV | 4.11 | Image preprocessing |
+| Pillow | 12.x | Image saving/conversion |
+| NumPy | 1.26 | Array operations |
+
+---
+
+## 🤖 AI Model Details
+
+### Production Model (`best.pt`)
+- **Source:** [HuggingFace — cazzz307/Pothole-Finetuned-YoloV8](https://huggingface.co/cazzz307/Pothole-Finetuned-YoloV8)
+- **Architecture:** YOLOv8 Medium (YOLOv8m)
+- **File:** `Yolov8-fintuned-on-potholes.pt`
+- **Size:** 52MB
+- **Confidence Threshold:** 0.6 (60%)
+- **Why chosen:** Detects water-filled potholes that our trained model missed
+
+### Our Trained Model (`best_original.pt`)
+- **Architecture:** YOLOv8 Nano (YOLOv8n)
+- **Dataset:** Our own annotated images (`annotated-images/`)
+- **Training:** Custom dataset of Indian road potholes
+
+### Model Comparison
+
+| Metric | Our Model | Production (cazzz307) |
+|---|---|---|
+| Architecture | YOLOv8n | YOLOv8m |
+| Size | ~6MB | 52MB |
+| Dry pothole confidence | **77.88%** | 76.12% |
+| Water-filled potholes | ❌ 0 detected | ✅ 2 detected |
+| Inference speed | **119ms** | 390ms |
+| Decision | Reference | **Active** |
+
+### How YOLO Works in This Project
+```
+Image Input (any resolution)
+        ↓
+Preprocessing → resize to 640×640, normalize
+        ↓
+CNN Backbone (CSPDarknet) → feature extraction
+  Early layers: edges → Mid layers: textures → Deep layers: pothole patterns
+        ↓
+FPN Neck → multi-scale feature fusion (20×20, 40×40, 80×80)
+        ↓
+Detection Head → 8,400 simultaneous box predictions
+        ↓
+Confidence filter → discard < 0.6
+        ↓
+NMS → remove duplicate overlapping boxes
+        ↓
+Our Severity Algorithm → priority score
+        ↓
+Annotated image saved → shown to citizen
+```
+
+---
+
+## 📐 Severity Algorithm
+
+Our **original 3-factor severity scoring** system goes beyond simple area-based detection:
+
+### Factor 1: Area Ratio
+```python
+area_ratio = (bbox_area / image_area) × 100
+# < 4%   → Minor    (base_weight = 1)
+# 4-10%  → Moderate (base_weight = 2)
+# > 10%  → Severe   (base_weight = 3)
+```
+
+### Factor 2: Position Factor
+```python
+# Center-lane potholes are more dangerous than edge potholes
+center_dist = abs(bbox_center_x - image_center_x) / (image_width / 2)
+position_factor = 1.2 - (0.2 × center_dist)  # range: 1.0 to 1.2
+```
+
+### Factor 3: Shape Factor
+```python
+# Square potholes are deeper than elongated surface cracks
+aspect = min(width, height) / max(width, height)
+shape_factor = 0.9 + (0.2 × aspect)  # range: 0.9 to 1.1
+```
+
+### Final Priority Score
+```python
+adjusted_weight = base_weight × position_factor × shape_factor
+
+# Prevent single severe pothole from being diluted by minor ones
+combined_sev = (max_severity × 0.7) + (avg_severity × 0.3)
+base_score   = (combined_sev × 0.6) + (density_weight × 0.4)
+final_score  = base_score × confidence_multiplier
+
+# Priority Thresholds
+# < 1.5  → LOW      → Monitor
+# < 2.5  → MEDIUM   → Schedule Repair
+# < 3.2  → HIGH     → Immediate Maintenance
+# ≥ 3.2  → CRITICAL → Emergency Response Required
+```
+
+---
+
+## 📁 Project Structure
+
+```
+Intelligent-Road-Damage-Detection/
+│
+├── main.py                    # FastAPI backend — all logic
+├── best.pt                    # Active model (cazzz307 YOLOv8m)
+├── best_original.pt           # Our trained model (reference)
+├── yolov8n.pt                 # Base YOLOv8 nano model
+├── reports.db                 # SQLite database
+├── .env                       # Environment variables (not committed)
+├── requirements.txt           # Python dependencies
+├── train.py                   # Model training script
+├── verify_db.py               # Database verification utility
+│
+├── annotated-images/          # Our training dataset
+├── uploads/                   # Saved report images
+├── pretrained_model/          # Downloaded HuggingFace models
+├── weights/                   # Training output weights
+│
+└── road-damage-ui/            # React frontend
+    ├── package.json
+    ├── vite.config.js
+    └── src/
+        ├── App.jsx            # Router + layout
+        ├── index.css          # All styles (design system)
+        ├── main.jsx           # Entry point
+        ├── pages/
+        │   ├── HomePage.jsx          # Landing page
+        │   ├── DetectPage.jsx        # 3-step report flow
+        │   ├── ReportPage.jsx        # Track report by ID
+        │   ├── AboutPage.jsx         # Project info
+        │   ├── AdminLogin.jsx        # Admin authentication
+        │   ├── AdminDashboard.jsx    # Admin management panel
+        │   └── CitizenTracking.jsx   # Real-time status tracking
+        ├── components/
+        │   ├── GovHeader.jsx         # Government-style header
+        │   ├── GovFooter.jsx         # Government-style footer
+        │   ├── NavBar.jsx            # Navigation bar
+        │   └── LocationPicker.jsx    # Leaflet map with drag pin
+        └── utils/
+            └── reportGenerator.js    # PDF generation
+```
+
+---
+
+## 🚀 Installation
+
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- Git
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/yourusername/Intelligent-Road-Damage-Detection.git
+cd Intelligent-Road-Damage-Detection
+```
+
+### 2. Backend Setup
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+venv\Scripts\activate
+
+# Activate (Linux/Mac)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Environment Variables
+Create a `.env` file in the project root:
+```env
+EMAIL_USER=your.gmail@gmail.com
+EMAIL_PASS=xxxx xxxx xxxx xxxx
+RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
+```
+
+> **Gmail App Password:** Go to myaccount.google.com → Security → 2-Step Verification → App Passwords → Generate 16-character password
+
+### 4. Frontend Setup
+```bash
+cd road-damage-ui
+npm install
+```
+
+### 5. Install Additional Python Packages
+```bash
+pip install slowapi httpx
+```
+
+---
+
+## ▶️ Running the Project
+
+### Start Backend
+```bash
+# In project root (with venv activated)
+python main.py
+```
+Backend runs at: **http://localhost:8000**
+
+### Start Frontend
+```bash
+# In road-damage-ui folder
+npm run dev
+```
+Frontend runs at: **http://localhost:5173**
+
+### Verify Setup
+```bash
+# Check backend health
+curl http://localhost:8000/health
+
+# Check API docs (Swagger UI)
+open http://localhost:8000/docs
+```
+
+### Default Admin Credentials
+```
+Username: admin
+Password: admin123
+Admin URL: http://localhost:5173/admin/login
+```
+
+---
+
+## 📡 API Reference
+
+### Public Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/health` | System health check |
+| POST | `/analyze` | Run YOLO detection on uploaded images |
+| POST | `/send-otp` | Send 6-digit OTP to email |
+| POST | `/verify-otp` | Verify OTP code |
+| POST | `/submit` | Save report to DB + send email |
+| GET | `/report/{report_id}` | Fetch report by ID |
+| POST | `/send-email/{report_id}` | Resend confirmation email |
+| GET | `/track/{report_id}?email=` | Citizen report tracking |
+| WS | `/ws/track/{report_id}` | WebSocket real-time updates |
+| GET | `/test-email` | Test email configuration |
+
+### Admin Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/admin/login` | Admin authentication |
+| GET | `/admin/stats` | Dashboard statistics |
+| GET | `/admin/reports` | All reports list |
+| PATCH | `/admin/reports/{id}` | Update report status/notes |
+| DELETE | `/admin/reports/{id}` | Delete a report |
+
+### Rate Limits
+- `/submit` — 10 requests per hour per IP
+- `/send-otp` — 5 requests per minute per IP
+- `/verify-otp` — 10 requests per minute per IP
+
+---
+
+## 🗄️ Database Schema
+
+### reports table
+```sql
+CREATE TABLE reports (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id             TEXT UNIQUE,          -- RD-2026-XXXXXXXX
+    citizen_name          TEXT,
+    citizen_email         TEXT,
+    citizen_phone         TEXT,
+    location              TEXT,
+    total_potholes        INTEGER DEFAULT 0,
+    worst_severity        TEXT,                 -- Minor/Moderate/Severe
+    overall_priority      TEXT,                 -- LOW/MEDIUM/HIGH/CRITICAL
+    max_confidence        REAL,
+    image_count           INTEGER DEFAULT 1,
+    image_paths           TEXT,                 -- JSON array
+    processed_image_paths TEXT,                 -- JSON array
+    status                TEXT DEFAULT 'Pending',
+    admin_note            TEXT DEFAULT '',
+    latitude              REAL,
+    longitude             REAL,
+    address               TEXT,
+    created_at            TEXT,
+    updated_at            TEXT
+)
+```
+
+### admins table
+```sql
+CREATE TABLE admins (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    name     TEXT
+)
+```
+
+### otp_verifications table
+```sql
+CREATE TABLE otp_verifications (
+    email      TEXT PRIMARY KEY,
+    otp_hash   TEXT,
+    expires_at TEXT,
+    verified   INTEGER DEFAULT 0,
+    updated_at TEXT
+)
+```
+
+---
+
+## 🔒 Security Features
+
+| Feature | Implementation |
+|---|---|
+| Email OTP verification | 6-digit code, SHA-256 hashed, 5-min expiry |
+| reCAPTCHA v3 | Invisible bot detection, score > 0.5 required |
+| Rate limiting | slowapi — per-IP per-hour limits |
+| File validation | Magic bytes check — JPEG/PNG/WEBP only |
+| File size limit | 10MB per image, 50MB total batch |
+| Temp file cleanup | Auto-delete orphan `tmp_` files on startup |
+| UUID report IDs | Prevents enumeration attacks |
+| Admin auth | Password-based with DB lookup |
+
+---
+
+## 🌐 Deployment
+
+### Frontend → Vercel (Free)
+```bash
+cd road-damage-ui
+npm run build
+# Deploy via Vercel CLI or GitHub integration
+```
+
+### Backend → Render (Free)
+```
+Build Command: pip install -r requirements.txt
+Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+### Images → Cloudinary (Free 25GB)
+Configure Cloudinary credentials in `.env` for persistent image storage.
+
+---
+
+## 👥 Team
+
+| Member | Roll Number | Role |
+|---|---|---|
+| **Hari Kesavan M** | 727823TUCS101 | Full Stack + AI/ML Lead |
+| **Mahesh P** | 727823TUCS — | Frontend Developer |
+| **Mahmood Sakeen N** | 727823TUCS — | Backend Developer |
+
+**Department:** Computer Science and Engineering
+**Institution:** VI Semester Capstone Project — 2026
+
+---
+
+## 🔮 Future Scope
+
+| Feature | Description | Priority |
+|---|---|---|
+| Crack detection | Multi-model pipeline for surface cracks | HIGH |
+| Mobile app | React Native citizen app | MEDIUM |
+| WhatsApp bot | Report via WhatsApp photo message | MEDIUM |
+| PostgreSQL | Production-grade database | HIGH |
+| AWS S3 | Scalable image storage | MEDIUM |
+| Model retraining | India-specific dataset on Colab | HIGH |
+| False positive filter | Reject non-road images automatically | HIGH |
+| Analytics dashboard | Trends, heatmaps, monthly reports | LOW |
+| Multi-language | Tamil, Hindi, Telugu support | LOW |
+
+---
+
+## 📄 License
+
+This project is developed for educational purposes as part of a VI Semester CSE Capstone Project.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) — Object detection framework
+- [cazzz307](https://huggingface.co/cazzz307) — Pre-trained pothole detection model
+- [FastAPI](https://fastapi.tiangolo.com/) — Modern Python web framework
+- [OpenStreetMap](https://www.openstreetmap.org/) — Free map tiles via Leaflet
+- [Roboflow Universe](https://universe.roboflow.com/) — Dataset platform
+
+---
+
+<div align="center">
+
+**Made with ❤️ for better roads and safer journeys**
+
+*IRDDP — Intelligent Road Damage Detection and Prioritization*
+
+</div>
